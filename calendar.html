@@ -556,6 +556,12 @@
       return new Date(d.getFullYear(), d.getMonth(), d.getDate() - diff);
     }
 
+    // 그 주의 일요일 (월간 달력은 일반 달력처럼 일요일부터 시작한다)
+    function sundayOf(d) {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay());
+    }
+    const MONTH_DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+
     // ---------- 저장/불러오기 ----------
     // 예전 데이터에 없는 항목은 기본값으로 채운다
     function normalize(t) {
@@ -845,20 +851,20 @@
       const grid = document.createElement("div");
       grid.className = "month-grid";
 
-      DAY_NAMES.forEach((name, i) => {
+      MONTH_DAY_NAMES.forEach((name, i) => {
         const h = document.createElement("div");
         h.className = "month-dayname";
-        if (i === 5) h.classList.add("sat");
-        if (i === 6) h.classList.add("sun");
+        if (i === 0) h.classList.add("sun");
+        if (i === 6) h.classList.add("sat");
         h.textContent = name;
         grid.appendChild(h);
       });
 
-      // 1일이 있는 주의 월요일부터 말일이 있는 주의 일요일까지
+      // 1일이 있는 주의 일요일부터 말일이 있는 주의 토요일까지
       const first = new Date(year, month, 1);
       const last = new Date(year, month + 1, 0);
-      const gridStart = mondayOf(first);
-      const gridEnd = addDays(mondayOf(last), 6);
+      const gridStart = sundayOf(first);
+      const gridEnd = addDays(sundayOf(last), 6);
 
       const monthDates = [];
       for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) {
@@ -871,9 +877,8 @@
         cell.className = "month-cell";
         if (!inMonth) cell.classList.add("other");
         if (dateStr === today) cell.classList.add("today");
-        const dow = (day.getDay() + 6) % 7;
-        if (dow === 5) cell.classList.add("sat");
-        if (dow === 6) cell.classList.add("sun");
+        if (day.getDay() === 6) cell.classList.add("sat");
+        if (day.getDay() === 0) cell.classList.add("sun");
 
         const goWeek = () => {
           focusDate = day;
