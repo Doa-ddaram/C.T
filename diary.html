@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>일기</title>
+  <style>
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Malgun Gothic", sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+      padding: 32px 16px;
+    }
+    @media (max-width: 520px) { body { padding: 16px 12px; } }
+    .app { max-width: 720px; margin: 0 auto; }
+
+    /* 공통 메뉴 (모든 페이지에 같은 모양으로 넣는다) */
+    .topnav {
+      display: flex;
+      gap: 4px;
+      max-width: 720px;
+      margin: 0 auto 20px;
+      padding: 4px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+    .topnav a {
+      flex: 1;
+      min-width: 0;
+      padding: 9px 4px;
+      border-radius: 8px;
+      color: #374151;
+      text-align: center;
+      text-decoration: none;
+      font-size: 0.95rem;
+      white-space: nowrap;
+    }
+    .topnav a:hover { background: #f3f4f6; }
+    .topnav a[aria-current="page"] { background: #2563eb; color: #fff; }
+
+    button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    button:hover { background: #1d4ed8; }
+    button.secondary { background: #fff; color: #1f2937; border: 1px solid #d1d5db; }
+    button.secondary:hover { background: #f3f4f6; }
+    button.danger { background: #fff; color: #dc2626; border: 1px solid #fca5a5; }
+    button.danger:hover { background: #fef2f2; }
+
+    header { margin-bottom: 16px; }
+    h1 { margin: 0 0 4px; font-size: 1.5rem; }
+    .date-label { margin: 0; color: #6b7280; }
+    .today-badge {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 8px;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-size: 0.8rem;
+    }
+    .datenav { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 12px; }
+    .datenav input {
+      padding: 7px 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      color: #1f2937;
+      background: #fff;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 { margin: 0 0 12px; font-size: 1.1rem; }
+    label.field { display: block; font-weight: 600; margin: 0 0 6px; }
+    .field-wrap { margin-bottom: 16px; }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-family: inherit;
+      color: #1f2937;
+    }
+    textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
+    .hint { margin: 6px 0 0; color: #6b7280; font-size: 0.85rem; }
+
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .actions .spacer { flex: 1; }
+    .status { color: #6b7280; font-size: 0.85rem; }
+
+    .history { list-style: none; margin: 0; padding: 0; }
+    .history li + li { border-top: 1px solid #f3f4f6; }
+    .history button {
+      display: block;
+      width: 100%;
+      padding: 10px 4px;
+      background: none;
+      color: #1f2937;
+      text-align: left;
+      border-radius: 6px;
+    }
+    .history button:hover { background: #f9fafb; }
+    .history button.current { background: #eff6ff; }
+    .history .h-date { color: #6b7280; font-size: 0.85rem; }
+    .history .h-main { font-weight: 600; margin-top: 2px; overflow-wrap: anywhere; }
+    .history .h-sub {
+      color: #4b5563;
+      font-size: 0.9rem;
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .empty { color: #9ca3af; margin: 0; }
+    textarea#body { min-height: 45vh; }
+    .ref {
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      border-left: 4px solid #93c5fd;
+      background: #eff6ff;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: #374151;
+    }
+    .ref-title { margin: 0 0 4px; color: #1d4ed8; font-weight: 600; font-size: 0.85rem; }
+    .ref p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .ref a { color: #1d4ed8; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <nav class="topnav" aria-label="페이지 메뉴">
+    <a href="index.html">홈</a>
+    <a href="calendar.html">캘린더</a>
+    <a href="review.html">하루 마무리</a>
+    <a href="diary.html" aria-current="page">일기</a>
+  </nav>
+
+  <div class="app">
+    <header>
+      <h1>일기</h1>
+      <p class="date-label"><span id="dateLabel"></span><span class="today-badge" id="todayBadge">오늘</span></p>
+      <div class="datenav">
+        <button class="secondary" id="prevDay">◀ 전날</button>
+        <button class="secondary" id="goToday">오늘</button>
+        <button class="secondary" id="nextDay">다음 날 ▶</button>
+        <input type="date" id="jumpDate" aria-label="날짜로 이동">
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="ref" id="refBox" hidden>
+        <p class="ref-title">이 날의 하루 마무리</p>
+        <p id="refHighlight"></p>
+        <p id="refComment"></p>
+      </div>
+      <div class="field-wrap">
+        <label class="field" for="title">제목 (선택)</label>
+        <input type="text" id="title" maxlength="200" placeholder="오늘의 제목">
+      </div>
+      <div class="field-wrap">
+        <label class="field" for="body">일기</label>
+        <textarea id="body" placeholder="오늘 있었던 일, 느낀 점을 자유롭게 적어 보세요."></textarea>
+      </div>
+      <div class="actions">
+        <button id="saveBtn">저장</button>
+        <span class="status" id="status"></span>
+        <span class="spacer"></span>
+        <button class="danger" id="deleteBtn">이 날 일기 지우기</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>지난 일기</h2>
+      <ul class="history" id="history"></ul>
+      <p class="empty" id="historyEmpty">아직 쓴 일기가 없어요.</p>
+    </section>
+  </div>
+
+  <script>
+    const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+
+    // ---------- 날짜 도우미 (현지 시간 기준, calendar.html과 같은 방식) ----------
+    const pad = (n) => String(n).padStart(2, "0");
+
+    function toDateStr(d) {
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    // "YYYY-MM-DD" → 현지 시간 Date
+    function parseDate(str) {
+      const [y, m, d] = str.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    function addDays(d, n) {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+    }
+
+    function isDateStr(str) {
+      return typeof str === "string" && /^\d{4}-\d{2}-\d{2}$/.test(str);
+    }
+
+    function longLabel(str) {
+      const d = parseDate(str);
+      return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${DAY_NAMES[d.getDay()]})`;
+    }
+
+    // ---------- 저장/불러오기 ----------
+    function loadObject(key) {
+      try {
+        const data = JSON.parse(localStorage.getItem(key));
+        return data && typeof data === "object" && !Array.isArray(data) ? data : {};
+      } catch (e) {
+        return {};
+      }
+    }
+    const loadDiary = () => loadObject("diaryEntries");
+    // 하루 마무리는 읽기만 한다 (쓰는 곳은 review.html)
+    const loadReviews = () => loadObject("dailyReviews");
+
+    // 다른 탭에서 쓴 내용을 덮어쓰지 않도록, 저장 직전에 다시 읽고 이 날짜만 바꾼다
+    function writeEntry(dateStr, entry) {
+      try {
+        const all = loadDiary();
+        if (entry) all[dateStr] = entry;
+        else delete all[dateStr];
+        localStorage.setItem("diaryEntries", JSON.stringify(all));
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // ---------- 화면 ----------
+    const $ = (id) => document.getElementById(id);
+    const titleEl = $("title");
+    const bodyEl = $("body");
+    const statusEl = $("status");
+
+    // 주소에 ?date=YYYY-MM-DD 가 있으면 그 날짜를 연다
+    let cur = toDateStr(new Date());
+    try {
+      const q = new URLSearchParams(location.search).get("date");
+      if (isDateStr(q)) cur = q;
+    } catch (e) {}
+
+    let dirty = false;
+    let saveTimer = null;
+
+    function setStatus(text) { statusEl.textContent = text; }
+
+    function saveNow() {
+      clearTimeout(saveTimer);
+      if (!dirty) return;
+      const title = titleEl.value.trim();
+      // 본문은 줄바꿈·들여쓰기를 살리고 끝의 빈 줄만 정리한다
+      const body = bodyEl.value.replace(/\s+$/, "");
+      const entry = title || body.trim() ? { title, body, updatedAt: Date.now() } : null;
+      if (writeEntry(cur, entry)) {
+        dirty = false;
+        $("deleteBtn").hidden = !entry;
+        const now = new Date();
+        setStatus(`저장됨 ${pad(now.getHours())}:${pad(now.getMinutes())}`);
+      } else {
+        setStatus("저장하지 못했어요. 브라우저 저장공간을 확인해 주세요.");
+      }
+      renderHistory();
+    }
+
+    // 입력을 잠깐 멈추면 자동으로 저장한다
+    function onInput() {
+      dirty = true;
+      setStatus("입력 중…");
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveNow, 700);
+    }
+
+    function goTo(dateStr) {
+      saveNow();
+      cur = dateStr;
+      render();
+      window.scrollTo(0, 0);
+    }
+
+    function firstLine(text) {
+      return (text || "").split("\n").map((l) => l.trim()).find((l) => l) || "";
+    }
+
+    function renderRef() {
+      const r = loadReviews()[cur];
+      const has = r && (r.highlight || r.comment);
+      $("refBox").hidden = !has;
+      if (!has) return;
+      $("refHighlight").textContent = r.highlight ? `대표 한 일: ${r.highlight}` : "";
+      $("refHighlight").hidden = !r.highlight;
+      $("refComment").textContent = r.comment || "";
+      $("refComment").hidden = !r.comment;
+    }
+
+    function renderHistory() {
+      const all = loadDiary();
+      const dates = Object.keys(all).filter(isDateStr).sort().reverse().slice(0, 60);
+      const list = $("history");
+      list.replaceChildren();
+      for (const d of dates) {
+        const e = all[d] || {};
+        const li = document.createElement("li");
+        const b = document.createElement("button");
+        b.type = "button";
+        if (d === cur) b.classList.add("current");
+
+        const dateEl = document.createElement("div");
+        dateEl.className = "h-date";
+        dateEl.textContent = longLabel(d);
+        const main = document.createElement("div");
+        main.className = "h-main";
+        main.textContent = e.title || firstLine(e.body) || "(내용 없음)";
+        b.append(dateEl, main);
+        // 제목이 있으면 본문 첫 줄을 아래에 보여준다
+        if (e.title && firstLine(e.body)) {
+          const sub = document.createElement("div");
+          sub.className = "h-sub";
+          sub.textContent = firstLine(e.body);
+          b.appendChild(sub);
+        }
+        b.addEventListener("click", () => goTo(d));
+        li.appendChild(b);
+        list.appendChild(li);
+      }
+      $("historyEmpty").hidden = dates.length > 0;
+    }
+
+    function render() {
+      const isToday = cur === toDateStr(new Date());
+      $("dateLabel").textContent = longLabel(cur);
+      $("todayBadge").hidden = !isToday;
+      $("jumpDate").value = cur;
+
+      const e = loadDiary()[cur] || {};
+      titleEl.value = e.title || "";
+      bodyEl.value = e.body || "";
+      dirty = false;
+      setStatus(e.updatedAt ? "저장된 내용" : "");
+      $("deleteBtn").hidden = !e.title && !e.body;
+
+      renderRef();
+      renderHistory();
+    }
+
+    titleEl.addEventListener("input", onInput);
+    bodyEl.addEventListener("input", onInput);
+    $("saveBtn").addEventListener("click", () => { dirty = true; saveNow(); render(); });
+    $("deleteBtn").addEventListener("click", () => {
+      if (!confirm(`${longLabel(cur)}의 일기를 지울까요? 지운 일기는 되돌릴 수 없어요.`)) return;
+      clearTimeout(saveTimer);
+      dirty = false;
+      if (!writeEntry(cur, null)) setStatus("지우지 못했어요.");
+      render();
+    });
+    $("prevDay").addEventListener("click", () => goTo(toDateStr(addDays(parseDate(cur), -1))));
+    $("nextDay").addEventListener("click", () => goTo(toDateStr(addDays(parseDate(cur), 1))));
+    $("goToday").addEventListener("click", () => goTo(toDateStr(new Date())));
+    $("jumpDate").addEventListener("change", (e) => { if (isDateStr(e.target.value)) goTo(e.target.value); });
+
+    // 페이지를 떠나거나 휴대폰에서 다른 앱으로 넘어갈 때 쓰던 내용을 저장한다
+    window.addEventListener("pagehide", saveNow);
+    document.addEventListener("visibilitychange", () => { if (document.hidden) saveNow(); });
+
+    render();
+  </script>
+</body>
+</html>

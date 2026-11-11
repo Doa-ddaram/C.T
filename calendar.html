@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>캘린더</title>
+  <style>
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Malgun Gothic", sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+      padding: 32px 16px;
+    }
+    .app { max-width: 1400px; margin: 0 auto; }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    h1 { margin: 0; font-size: 1.5rem; }
+    .week-label { margin: 4px 0 0; color: #6b7280; font-size: 0.95rem; }
+    .nav { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .jump {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.9rem;
+      color: #6b7280;
+    }
+    .jump input {
+      padding: 7px 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      color: #1f2937;
+      background: #fff;
+    }
+    button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    button:hover { background: #1d4ed8; }
+    button.secondary { background: #fff; color: #1f2937; border: 1px solid #d1d5db; }
+    button.secondary:hover { background: #f3f4f6; }
+
+    /* 요일 칸 배치: 넓은 화면은 7칸 가로, 중간은 자동, 좁은 화면은 세로 */
+    .week {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    @media (min-width: 1100px) {
+      .week { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    }
+    @media (max-width: 520px) {
+      .week { grid-template-columns: 1fr; }
+    }
+
+    .column {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      min-height: 160px;
+      border: 2px solid transparent;
+    }
+    .column.today { border-color: #2563eb; }
+    .column.drag-over { background: #eff6ff; }
+    .column-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .column-head h2 { margin: 0; font-size: 1rem; }
+    .column-head .date { color: #6b7280; font-size: 0.85rem; }
+    .column.today .column-head h2,
+    .column.today .column-head .date { color: #2563eb; }
+    .today-badge {
+      font-size: 0.7rem;
+      background: #2563eb;
+      color: #fff;
+      border-radius: 999px;
+      padding: 1px 6px;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+    .weekend-sun h2 { color: #dc2626; }
+    .weekend-sat h2 { color: #2563eb; }
+
+    .unscheduled { margin-top: 16px; min-height: 120px; }
+    .unscheduled .column-head h2 { font-size: 1.1rem; }
+
+    .column-body { flex: 1; display: flex; flex-direction: column; }
+    ul { list-style: none; margin: 0; padding: 0; flex: 1; }
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 4px;
+      border-bottom: 1px solid #e5e7eb;
+      cursor: grab;
+    }
+    li:last-child { border-bottom: none; }
+    li.dragging { opacity: 0.4; }
+    li input[type="checkbox"] { width: 16px; height: 16px; margin-top: 3px; cursor: pointer; flex-shrink: 0; }
+    .item-body { flex: 1; min-width: 0; cursor: pointer; }
+    .item-time { font-size: 0.8rem; color: #2563eb; }
+    .item-time .tbd { color: #9ca3af; }
+    .item-text { word-break: break-word; }
+    li.done .item-text { text-decoration: line-through; color: #9ca3af; }
+    li.done .item-time { color: #9ca3af; }
+    .delete {
+      background: none;
+      color: #9ca3af;
+      padding: 0 6px;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .delete:hover { background: #fee2e2; color: #dc2626; }
+    .add {
+      margin-top: 8px;
+      background: none;
+      color: #6b7280;
+      border: 1px dashed #d1d5db;
+      width: 100%;
+    }
+    .add:hover { background: #f3f4f6; color: #1f2937; }
+    .empty { color: #9ca3af; font-size: 0.85rem; padding: 8px 4px; margin: 0; }
+
+    .footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+      font-size: 0.9rem;
+      color: #6b7280;
+    }
+
+    /* 행 방향 보기: 요일을 한 줄씩 위아래로 쌓고, 할일은 옆으로 나열 */
+    .week.rows { grid-template-columns: 1fr; }
+    .week.rows .column {
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 16px;
+      min-height: 0;
+    }
+    .week.rows .column-head {
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+      gap: 2px;
+      width: 90px;
+      flex-shrink: 0;
+      margin-bottom: 0;
+    }
+    .week.rows .column-body {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 8px;
+      min-width: 0;
+    }
+    .week.rows ul { display: flex; flex-wrap: wrap; gap: 8px; flex: 0 1 auto; }
+    .week.rows li {
+      width: 220px;
+      max-width: 100%;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 6px 8px;
+    }
+    .week.rows .add { margin-top: 0; width: auto; }
+    .week.rows .empty { padding: 6px 0; }
+    @media (max-width: 520px) {
+      .week.rows .column { flex-direction: column; gap: 8px; }
+      .week.rows .column-head { flex-direction: row; align-items: baseline; gap: 8px; width: auto; }
+      .week.rows li { width: 100%; }
+    }
+
+    /* 주간 / 월간 전환 */
+    .view-switch {
+      display: inline-flex;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .view-switch button { border-radius: 0; background: #fff; color: #1f2937; }
+    .view-switch button:hover { background: #f3f4f6; }
+    .view-switch button.active { background: #2563eb; color: #fff; }
+
+    /* 월간 보기 */
+    .month {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    .month-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 1px;
+      background: #e5e7eb;
+    }
+    .month-dayname {
+      background: #f9fafb;
+      text-align: center;
+      padding: 8px 4px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .month-dayname.sat { color: #2563eb; }
+    .month-dayname.sun { color: #dc2626; }
+    .month-cell {
+      background: #fff;
+      min-height: 110px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .month-cell.other { background: #f9fafb; }
+    .month-cell.drag-over { background: #eff6ff; }
+    .month-cell-top { display: flex; justify-content: space-between; align-items: center; }
+    .month-date {
+      background: none;
+      color: #1f2937;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .month-date:hover { background: #e5e7eb; }
+    .month-cell.sat .month-date { color: #2563eb; }
+    .month-cell.sun .month-date { color: #dc2626; }
+    .month-cell.other .month-date { color: #9ca3af; font-weight: 400; }
+    .month-cell.today .month-date { background: #2563eb; color: #fff; }
+    .month-add {
+      background: none;
+      color: #9ca3af;
+      padding: 0 6px;
+      font-size: 1rem;
+    }
+    .month-add:hover { background: #f3f4f6; color: #1f2937; }
+    .month-item {
+      font-size: 0.8rem;
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #eff6ff;
+      color: #1e40af;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+    }
+    .month-item:hover { background: #dbeafe; }
+    .month-item.done { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
+    .month-more, .month-count {
+      background: none;
+      color: #6b7280;
+      padding: 0 4px;
+      font-size: 0.75rem;
+      text-align: left;
+    }
+    .month-more:hover, .month-count:hover { background: #f3f4f6; color: #1f2937; }
+    .month-count { display: none; }
+    @media (max-width: 640px) {
+      .month-cell { min-height: 64px; padding: 4px 2px; }
+      .month-add, .month-item, .month-more { display: none; }
+      .month-count { display: block; color: #2563eb; font-weight: 600; }
+      .month-date { padding: 2px 5px; font-size: 0.8rem; }
+    }
+
+    /* 반복 일정 / 취소 표시 */
+    .cancel-badge {
+      font-size: 0.7rem;
+      background: #fee2e2;
+      color: #dc2626;
+      border-radius: 999px;
+      padding: 0 6px;
+      margin-left: 4px;
+    }
+    li.canceled .item-text { text-decoration: line-through; color: #9ca3af; }
+    li.canceled .item-time { color: #9ca3af; }
+    .month-item.canceled { background: #fef2f2; color: #f87171; text-decoration: line-through; }
+
+    /* 할일 추가/수정 창 */
+    dialog {
+      border: none;
+      border-radius: 12px;
+      padding: 24px;
+      width: min(420px, calc(100vw - 32px));
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      color: #1f2937;
+    }
+    dialog { max-height: calc(100vh - 32px); overflow-y: auto; }
+    dialog::backdrop { background: rgba(0, 0, 0, 0.35); }
+    .field > label.check-label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .repeat-box {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px 12px 0;
+      margin-bottom: 14px;
+    }
+    .weekday-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+    .weekday-picks label {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 0.9rem;
+      background: #fff;
+      cursor: pointer;
+    }
+    dialog select {
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-family: inherit;
+      background: #fff;
+    }
+    .series-info {
+      font-size: 0.85rem;
+      color: #1e40af;
+      background: #eff6ff;
+      padding: 8px 10px;
+      border-radius: 8px;
+      margin: 0 0 14px;
+    }
+    .scope { display: flex; flex-direction: column; gap: 4px; }
+    .scope label { font-size: 0.9rem; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    button.danger { background: #fff; color: #dc2626; border: 1px solid #fecaca; }
+    button.danger:hover { background: #fee2e2; }
+    dialog h3 { margin: 0 0 16px; }
+    .field { margin-bottom: 14px; }
+    .field > label { display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 6px; }
+    .row { display: flex; align-items: center; gap: 10px; }
+    .row label { font-size: 0.9rem; display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+    dialog input[type="text"],
+    dialog input[type="date"],
+    dialog input[type="time"] {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-family: inherit;
+    }
+    dialog input:disabled { background: #f3f4f6; color: #9ca3af; }
+    .row input[type="date"], .row input[type="time"] { flex: 1; min-width: 0; }
+    .error { color: #dc2626; font-size: 0.9rem; margin: 0 0 12px; }
+    .dialog-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .dialog-buttons .spacer { flex: 1; }
+
+    /* 공통 메뉴 (모든 페이지에 같은 모양으로 넣는다) */
+    .topnav {
+      display: flex;
+      gap: 4px;
+      max-width: 720px;
+      margin: 0 auto 20px;
+      padding: 4px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+    .topnav a {
+      flex: 1;
+      min-width: 0;
+      padding: 9px 4px;
+      border-radius: 8px;
+      color: #374151;
+      text-align: center;
+      text-decoration: none;
+      font-size: 0.95rem;
+      white-space: nowrap;
+    }
+    .topnav a:hover { background: #f3f4f6; }
+    .topnav a[aria-current="page"] { background: #2563eb; color: #fff; }
+  </style>
+</head>
+<body>
+  <nav class="topnav" aria-label="페이지 메뉴">
+    <a href="index.html">홈</a>
+    <a href="calendar.html" aria-current="page">캘린더</a>
+    <a href="review.html">하루 마무리</a>
+    <a href="diary.html">일기</a>
+  </nav>
+  <div class="app">
+    <header>
+      <div>
+        <h1>캘린더</h1>
+        <p class="week-label" id="weekLabel"></p>
+      </div>
+      <div class="nav">
+        <div class="view-switch" role="group" aria-label="보기 방식">
+          <button type="button" id="viewWeek">주간</button>
+          <button type="button" id="viewMonth">월간</button>
+        </div>
+        <button class="secondary" id="prevWeek">◀ 이전 주</button>
+        <button class="secondary" id="thisWeek">이번 주</button>
+        <button class="secondary" id="nextWeek">다음 주 ▶</button>
+        <button class="secondary" id="toggleLayout"></button>
+        <label class="jump">날짜로 이동
+          <input type="date" id="jumpDate" title="날짜를 고르면 그 주로 이동합니다">
+        </label>
+      </div>
+    </header>
+
+    <div class="week" id="week"></div>
+    <div class="month" id="month" hidden></div>
+
+    <section class="column unscheduled" id="unscheduled"></section>
+
+    <div class="footer">
+      <span id="count"></span>
+      <button class="secondary" id="clear">완료 항목 삭제</button>
+    </div>
+  </div>
+
+  <dialog id="dialog">
+    <form id="form" novalidate>
+      <h3 id="dialogTitle">할일 추가</h3>
+
+      <p class="series-info" id="seriesInfo" hidden></p>
+
+      <div class="field">
+        <label for="fText">할일</label>
+        <input type="text" id="fText" placeholder="할일을 입력하세요" autocomplete="off">
+      </div>
+
+      <div class="field" id="repeatToggleField">
+        <label class="check-label"><input type="checkbox" id="fRepeat"> 반복 일정 (요일마다 반복)</label>
+      </div>
+
+      <div class="repeat-box" id="repeatBox" hidden>
+        <div class="field">
+          <label>반복 요일</label>
+          <div class="weekday-picks" id="fWeekdays">
+            <label><input type="checkbox" value="0"> 월</label>
+            <label><input type="checkbox" value="1"> 화</label>
+            <label><input type="checkbox" value="2"> 수</label>
+            <label><input type="checkbox" value="3"> 목</label>
+            <label><input type="checkbox" value="4"> 금</label>
+            <label><input type="checkbox" value="5"> 토</label>
+            <label><input type="checkbox" value="6"> 일</label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="fInterval">반복 간격</label>
+          <select id="fInterval">
+            <option value="1">매주</option>
+            <option value="2">2주마다</option>
+            <option value="3">3주마다</option>
+            <option value="4">4주마다</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fRepeatStart">반복 기간</label>
+          <div class="row">
+            <input type="date" id="fRepeatStart" title="반복 시작일">
+            <span>~</span>
+            <input type="date" id="fRepeatEnd" title="반복 종료일">
+          </div>
+        </div>
+      </div>
+
+      <div class="field" id="dateField">
+        <label for="fDate">날짜</label>
+        <div class="row">
+          <input type="date" id="fDate">
+          <label><input type="checkbox" id="fDateTbd"> 일정 미정</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fStart">시작 시간</label>
+        <div class="row">
+          <input type="time" id="fStart">
+          <label><input type="checkbox" id="fStartTbd"> 미정</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fEnd">끝나는 시간</label>
+        <div class="row">
+          <input type="time" id="fEnd">
+          <label><input type="checkbox" id="fEndTbd"> 미정</label>
+        </div>
+      </div>
+
+      <div class="field" id="scopeField" hidden>
+        <label>적용 범위 (저장·삭제)</label>
+        <div class="scope">
+          <label><input type="radio" name="scope" value="one" checked> 이 날짜만</label>
+          <label><input type="radio" name="scope" value="future"> 이 날짜와 이후 반복</label>
+          <label><input type="radio" name="scope" value="all"> 모든 반복</label>
+        </div>
+      </div>
+
+      <p class="error" id="error" hidden></p>
+
+      <div class="dialog-buttons">
+        <button type="button" class="danger" id="deleteBtn" hidden>삭제</button>
+        <button type="button" class="secondary" id="cancelOnceBtn" hidden>이번만 취소</button>
+        <span class="spacer"></span>
+        <button type="button" class="secondary" id="cancel">닫기</button>
+        <button type="submit">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const DAY_NAMES = ["월", "화", "수", "목", "금", "토", "일"];
+
+    // ---------- 날짜 도우미 (현지 시간 기준) ----------
+    const pad = (n) => String(n).padStart(2, "0");
+
+    function toDateStr(d) {
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    // "YYYY-MM-DD" → 현지 시간 Date
+    function parseDate(str) {
+      const [y, m, d] = str.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    function addDays(d, n) {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+    }
+
+    // 그 주의 월요일
+    function mondayOf(d) {
+      const diff = (d.getDay() + 6) % 7;
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() - diff);
+    }
+
+    // ---------- 저장/불러오기 ----------
+    // 예전 데이터에 없는 항목은 기본값으로 채운다
+    function normalize(t) {
+      return {
+        id: t.id,
+        text: t.text,
+        date: t.date ?? null,
+        startTime: t.startTime ?? null,
+        endTime: t.endTime ?? null,
+        done: !!t.done,
+        seriesId: t.seriesId ?? null,
+        seriesDate: t.seriesDate ?? null,
+        canceled: !!t.canceled,
+      };
+    }
+
+    function load() {
+      try {
+        const saved = localStorage.getItem("calendarTodos");
+        if (saved) return (JSON.parse(saved) || []).map(normalize);
+
+        // 예전 할일 목록(todos)이 있으면 일정 미정 칸으로 옮긴다. 예전 데이터는 지우지 않는다.
+        const old = JSON.parse(localStorage.getItem("todos")) || [];
+        return old.map((t) => normalize({ id: t.id, text: t.text, done: t.done }));
+      } catch (e) {
+        return [];
+      }
+    }
+
+    // 반복 일정 설정 { 반복번호: { weekdays, interval, start, end } }
+    function loadSeries() {
+      try { return JSON.parse(localStorage.getItem("calendarSeries")) || {}; } catch (e) { return {}; }
+    }
+
+    function save() {
+      try {
+        localStorage.setItem("calendarTodos", JSON.stringify(todos));
+        localStorage.setItem("calendarSeries", JSON.stringify(series));
+      } catch (e) {}
+    }
+
+    let series = loadSeries();
+    let todos = load();
+    save();
+
+    // 할일이 한꺼번에 여러 개 생겨도 번호가 겹치지 않게 한다
+    let lastId = todos.reduce((max, t) => Math.max(max, Number(t.id) || 0), 0);
+    function newId() {
+      lastId = Math.max(Date.now(), lastId + 1);
+      return lastId;
+    }
+
+    // 남은 할일이 없는 반복 설정은 지운다
+    function cleanupSeries() {
+      for (const id of Object.keys(series)) {
+        if (!todos.some((t) => String(t.seriesId) === id)) delete series[id];
+      }
+    }
+
+    // 보고 있는 날짜(이 날짜가 속한 주나 달을 보여준다)와 보기 방식
+    let focusDate = new Date();
+    let view = "week";
+    try { if (localStorage.getItem("calendarView") === "month") view = "month"; } catch (e) {}
+
+    // 시작 시간 순, 시작 시간 미정은 맨 아래
+    function compareTodos(a, b) {
+      if (a.startTime !== b.startTime) {
+        if (a.startTime === null) return 1;
+        if (b.startTime === null) return -1;
+        return a.startTime < b.startTime ? -1 : 1;
+      }
+      if (a.endTime !== b.endTime) {
+        if (a.endTime === null) return 1;
+        if (b.endTime === null) return -1;
+        return a.endTime < b.endTime ? -1 : 1;
+      }
+      return a.id - b.id;
+    }
+
+    // ---------- 화면 그리기 ----------
+    const weekEl = document.getElementById("week");
+    const monthEl = document.getElementById("month");
+    const unscheduledEl = document.getElementById("unscheduled");
+    const weekLabel = document.getElementById("weekLabel");
+    const countEl = document.getElementById("count");
+
+    function timeSpan(value, tbdText) {
+      const span = document.createElement("span");
+      if (value) {
+        span.textContent = value;
+      } else {
+        span.className = "tbd";
+        span.textContent = tbdText;
+      }
+      return span;
+    }
+
+    // 할일을 끌 수 있게 한다
+    function makeDraggable(el, todo) {
+      el.draggable = true;
+      el.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", String(todo.id));
+        e.dataTransfer.effectAllowed = "move";
+        el.classList.add("dragging");
+      });
+      el.addEventListener("dragend", () => el.classList.remove("dragging"));
+    }
+
+    // 할일을 놓으면 그 날짜(null이면 일정 미정)로 옮긴다
+    function enableDrop(el, date) {
+      el.ondragover = (e) => {
+        e.preventDefault();
+        el.classList.add("drag-over");
+      };
+      el.ondragleave = (e) => {
+        if (!el.contains(e.relatedTarget)) el.classList.remove("drag-over");
+      };
+      el.ondrop = (e) => {
+        e.preventDefault();
+        el.classList.remove("drag-over");
+        const id = Number(e.dataTransfer.getData("text/plain"));
+        const todo = todos.find((t) => t.id === id);
+        if (todo && todo.date !== date) {
+          todo.date = date;
+          save();
+          render();
+        }
+      };
+    }
+
+    function renderItem(todo) {
+      const li = document.createElement("li");
+      makeDraggable(li, todo);
+      if (todo.done) li.classList.add("done");
+      if (todo.canceled) li.classList.add("canceled");
+
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.checked = todo.done;
+      check.title = "완료";
+      check.addEventListener("change", () => {
+        todo.done = check.checked;
+        save();
+        render();
+      });
+
+      const body = document.createElement("div");
+      body.className = "item-body";
+      body.title = "눌러서 수정";
+      body.addEventListener("click", () => openDialog(todo));
+
+      const time = document.createElement("div");
+      time.className = "item-time";
+      if (todo.seriesId !== null) time.append("🔁 ");
+      time.append(timeSpan(todo.startTime, "미정"), " ~ ", timeSpan(todo.endTime, "미정"));
+      if (todo.canceled) {
+        const badge = document.createElement("span");
+        badge.className = "cancel-badge";
+        badge.textContent = "취소";
+        time.append(badge);
+      }
+
+      const text = document.createElement("div");
+      text.className = "item-text";
+      text.textContent = todo.text;
+
+      body.append(time, text);
+
+      const del = document.createElement("button");
+      del.className = "delete";
+      del.textContent = "✕";
+      del.title = "삭제";
+      del.addEventListener("click", () => {
+        // 반복 일정은 이 날짜 것만 지운다
+        if (todo.seriesId !== null &&
+            !confirm("이 날짜의 반복 일정만 삭제할까요?\n다른 날짜까지 지우려면 일정을 눌러 수정 창에서 삭제하세요.")) return;
+        todos = todos.filter((t) => t.id !== todo.id);
+        cleanupSeries();
+        save();
+        render();
+      });
+
+      li.append(check, body, del);
+      return li;
+    }
+
+    // 요일 칸 / 일정 미정 칸 하나를 채운다. date가 null이면 일정 미정 칸.
+    function fillColumn(col, date, headHtmlParts) {
+      col.innerHTML = "";
+
+      const head = document.createElement("div");
+      head.className = "column-head";
+      head.append(...headHtmlParts);
+
+      const items = todos
+        .filter((t) => t.date === date)
+        .sort(compareTodos);
+
+      const ul = document.createElement("ul");
+      items.forEach((t) => ul.appendChild(renderItem(t)));
+
+      const add = document.createElement("button");
+      add.className = "add";
+      add.textContent = "+ 할일 추가";
+      add.addEventListener("click", () => openDialog(null, date));
+
+      const body = document.createElement("div");
+      body.className = "column-body";
+      if (items.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "empty";
+        empty.textContent = "할일이 없습니다.";
+        body.append(empty);
+      }
+      body.append(ul, add);
+      col.append(head, body);
+
+      enableDrop(col, date);
+    }
+
+    // 주간 보기를 그리고, 보여준 날짜 목록을 돌려준다
+    function renderWeek() {
+      const today = toDateStr(new Date());
+      const weekStart = mondayOf(focusDate);
+      const weekEnd = addDays(weekStart, 6);
+
+      const sameYear = weekStart.getFullYear() === weekEnd.getFullYear();
+      weekLabel.textContent =
+        `${weekStart.getFullYear()}년 ${weekStart.getMonth() + 1}월 ${weekStart.getDate()}일 ~ ` +
+        (sameYear ? "" : `${weekEnd.getFullYear()}년 `) +
+        `${weekEnd.getMonth() + 1}월 ${weekEnd.getDate()}일`;
+
+      weekEl.innerHTML = "";
+      const weekDates = [];
+      for (let i = 0; i < 7; i++) {
+        const d = addDays(weekStart, i);
+        const dateStr = toDateStr(d);
+        weekDates.push(dateStr);
+
+        const col = document.createElement("section");
+        col.className = "column";
+        if (i === 5) col.classList.add("weekend-sat");
+        if (i === 6) col.classList.add("weekend-sun");
+        if (dateStr === today) col.classList.add("today");
+
+        const h2 = document.createElement("h2");
+        h2.textContent = `${DAY_NAMES[i]}요일`;
+        if (dateStr === today) {
+          const badge = document.createElement("span");
+          badge.className = "today-badge";
+          badge.textContent = "오늘";
+          h2.append(badge);
+        }
+        const dateSpan = document.createElement("span");
+        dateSpan.className = "date";
+        dateSpan.textContent = `${d.getMonth() + 1}/${d.getDate()}`;
+
+        fillColumn(col, dateStr, [h2, dateSpan]);
+        weekEl.appendChild(col);
+      }
+      return weekDates;
+    }
+
+    const MONTH_MAX_ITEMS = 3; // 월간 칸 하나에 보여줄 할일 수
+
+    function renderMonthItem(todo) {
+      const item = document.createElement("div");
+      item.className = "month-item";
+      if (todo.done) item.classList.add("done");
+      if (todo.canceled) item.classList.add("canceled");
+      item.textContent = (todo.seriesId !== null ? "🔁" : "") +
+        (todo.startTime ? `${todo.startTime} ${todo.text}` : todo.text);
+      item.title = `${todo.startTime || "미정"} ~ ${todo.endTime || "미정"}  ${todo.text}\n눌러서 수정`;
+      item.addEventListener("click", () => openDialog(todo));
+      makeDraggable(item, todo);
+      return item;
+    }
+
+    // 월간 보기를 그리고, 그 달의 날짜 목록을 돌려준다
+    function renderMonth() {
+      const today = toDateStr(new Date());
+      const year = focusDate.getFullYear();
+      const month = focusDate.getMonth();
+      weekLabel.textContent = `${year}년 ${month + 1}월`;
+
+      monthEl.innerHTML = "";
+      const grid = document.createElement("div");
+      grid.className = "month-grid";
+
+      DAY_NAMES.forEach((name, i) => {
+        const h = document.createElement("div");
+        h.className = "month-dayname";
+        if (i === 5) h.classList.add("sat");
+        if (i === 6) h.classList.add("sun");
+        h.textContent = name;
+        grid.appendChild(h);
+      });
+
+      // 1일이 있는 주의 월요일부터 말일이 있는 주의 일요일까지
+      const first = new Date(year, month, 1);
+      const last = new Date(year, month + 1, 0);
+      const gridStart = mondayOf(first);
+      const gridEnd = addDays(mondayOf(last), 6);
+
+      const monthDates = [];
+      for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) {
+        const day = d;
+        const dateStr = toDateStr(day);
+        const inMonth = day.getMonth() === month;
+        if (inMonth) monthDates.push(dateStr);
+
+        const cell = document.createElement("div");
+        cell.className = "month-cell";
+        if (!inMonth) cell.classList.add("other");
+        if (dateStr === today) cell.classList.add("today");
+        const dow = (day.getDay() + 6) % 7;
+        if (dow === 5) cell.classList.add("sat");
+        if (dow === 6) cell.classList.add("sun");
+
+        const goWeek = () => {
+          focusDate = day;
+          setView("week");
+        };
+
+        const top = document.createElement("div");
+        top.className = "month-cell-top";
+        const dateBtn = document.createElement("button");
+        dateBtn.className = "month-date";
+        dateBtn.textContent = day.getDate();
+        dateBtn.title = "이 주를 주간으로 보기";
+        dateBtn.addEventListener("click", goWeek);
+        const add = document.createElement("button");
+        add.className = "month-add";
+        add.textContent = "+";
+        add.title = "이 날짜에 할일 추가";
+        add.addEventListener("click", () => openDialog(null, dateStr));
+        top.append(dateBtn, add);
+        cell.append(top);
+
+        const items = todos.filter((t) => t.date === dateStr).sort(compareTodos);
+        items.slice(0, MONTH_MAX_ITEMS).forEach((t) => cell.append(renderMonthItem(t)));
+
+        if (items.length > MONTH_MAX_ITEMS) {
+          const more = document.createElement("button");
+          more.className = "month-more";
+          more.textContent = `+${items.length - MONTH_MAX_ITEMS}개 더`;
+          more.title = "이 주를 주간으로 보기";
+          more.addEventListener("click", goWeek);
+          cell.append(more);
+        }
+
+        // 좁은 화면에서는 할일 대신 개수만 보여준다
+        if (items.length > 0) {
+          const count = document.createElement("button");
+          count.className = "month-count";
+          count.textContent = `${items.length}개`;
+          count.title = "이 주를 주간으로 보기";
+          count.addEventListener("click", goWeek);
+          cell.append(count);
+        }
+
+        enableDrop(cell, dateStr);
+        grid.appendChild(cell);
+      }
+
+      monthEl.appendChild(grid);
+      return monthDates;
+    }
+
+    function render() {
+      const isMonth = view === "month";
+      weekEl.hidden = isMonth;
+      monthEl.hidden = !isMonth;
+      toggleLayoutBtn.hidden = isMonth;
+      viewWeekBtn.classList.toggle("active", !isMonth);
+      viewMonthBtn.classList.toggle("active", isMonth);
+      viewWeekBtn.setAttribute("aria-pressed", String(!isMonth));
+      viewMonthBtn.setAttribute("aria-pressed", String(isMonth));
+      prevBtn.textContent = isMonth ? "◀ 이전 달" : "◀ 이전 주";
+      todayBtn.textContent = isMonth ? "이번 달" : "이번 주";
+      nextBtn.textContent = isMonth ? "다음 달 ▶" : "다음 주 ▶";
+      jumpDateInput.title = isMonth ? "날짜를 고르면 그 달로 이동합니다" : "날짜를 고르면 그 주로 이동합니다";
+
+      const shownDates = isMonth ? renderMonth() : renderWeek();
+
+      const uh2 = document.createElement("h2");
+      uh2.textContent = "일정 미정";
+      const uhint = document.createElement("span");
+      uhint.className = "date";
+      uhint.textContent = "날짜가 정해지면 날짜 칸으로 끌어다 놓거나 눌러서 날짜를 지정하세요";
+      fillColumn(unscheduledEl, null, [uh2, uhint]);
+
+      const shownTodos = todos.filter((t) => shownDates.includes(t.date) && !t.canceled);
+      const shownLeft = shownTodos.filter((t) => !t.done).length;
+      const unscheduledLeft = todos.filter((t) => t.date === null && !t.done && !t.canceled).length;
+      const range = isMonth ? `${focusDate.getMonth() + 1}월` : "이 주";
+      countEl.textContent =
+        `${range} 남은 할일 ${shownLeft}개 / ${shownTodos.length}개 · 일정 미정 남은 할일 ${unscheduledLeft}개`;
+    }
+
+    // ---------- 추가/수정 창 ----------
+    const $ = (id) => document.getElementById(id);
+    const dialog = $("dialog");
+    const form = $("form");
+    const dialogTitle = $("dialogTitle");
+    const seriesInfo = $("seriesInfo");
+    const fText = $("fText");
+    const repeatToggleField = $("repeatToggleField");
+    const fRepeat = $("fRepeat");
+    const repeatBox = $("repeatBox");
+    const fWeekdays = $("fWeekdays");
+    const fInterval = $("fInterval");
+    const fRepeatStart = $("fRepeatStart");
+    const fRepeatEnd = $("fRepeatEnd");
+    const dateField = $("dateField");
+    const fDate = $("fDate");
+    const fDateTbd = $("fDateTbd");
+    const fStart = $("fStart");
+    const fStartTbd = $("fStartTbd");
+    const fEnd = $("fEnd");
+    const fEndTbd = $("fEndTbd");
+    const scopeField = $("scopeField");
+    const errorEl = $("error");
+    const deleteBtn = $("deleteBtn");
+    const cancelOnceBtn = $("cancelOnceBtn");
+
+    let editing = null; // 수정 중인 할일 (새 할일이면 null)
+
+    // 미정 체크박스를 누르면 옆 입력칸을 끄고 켠다
+    function linkTbd(checkbox, input) {
+      const sync = () => { input.disabled = checkbox.checked; };
+      checkbox.addEventListener("change", sync);
+      return sync;
+    }
+    const syncStart = linkTbd(fStartTbd, fStart);
+    const syncEnd = linkTbd(fEndTbd, fEnd);
+
+    function getScope() {
+      const checked = form.querySelector('input[name="scope"]:checked');
+      return checked ? checked.value : "one";
+    }
+
+    // 여러 반복에 한꺼번에 적용할 때는 날짜를 바꿀 수 없다
+    function isManyScope() {
+      return !!(editing && editing.seriesId !== null && getScope() !== "one");
+    }
+
+    function syncDate() {
+      fDateTbd.disabled = isManyScope();
+      fDate.disabled = isManyScope() || fDateTbd.checked;
+    }
+    fDateTbd.addEventListener("change", syncDate);
+    form.querySelectorAll('input[name="scope"]').forEach((r) => r.addEventListener("change", syncDate));
+
+    // 반복 일정을 켜면 날짜 대신 반복 설정을 보여준다
+    function syncRepeat() {
+      repeatBox.hidden = !fRepeat.checked;
+      dateField.hidden = fRepeat.checked;
+    }
+    fRepeat.addEventListener("change", syncRepeat);
+
+    // 반복 날짜 목록. 기간이 너무 길면 null
+    function repeatDates(startStr, endStr, weekdays, interval) {
+      const start = parseDate(startStr);
+      const end = parseDate(endStr);
+      if ((end - start) / 86400000 > 366 * 3) return null;
+      const baseMonday = mondayOf(start);
+      const dates = [];
+      for (let d = start; d <= end; d = addDays(d, 1)) {
+        const weekIndex = Math.round((mondayOf(d) - baseMonday) / (7 * 86400000));
+        const dow = (d.getDay() + 6) % 7;
+        if (weekIndex % interval === 0 && weekdays.includes(dow)) dates.push(toDateStr(d));
+      }
+      return dates;
+    }
+
+    function describeSeries(seriesId) {
+      const def = series[seriesId];
+      const dates = todos
+        .filter((t) => t.seriesId === seriesId && t.seriesDate)
+        .map((t) => t.seriesDate)
+        .sort();
+      let text = "🔁 반복 일정";
+      if (def) {
+        const days = def.weekdays.map((i) => DAY_NAMES[i]).join("·");
+        text += ` · ${def.interval > 1 ? `${def.interval}주마다` : "매주"} ${days}요일`;
+      }
+      if (dates.length) text += ` · ${dates[0]} ~ ${dates[dates.length - 1]} (${dates.length}개)`;
+      return text;
+    }
+
+    // 적용 범위에 해당하는 반복 일정들
+    function scopeTargets(todo, scope) {
+      if (todo.seriesId === null || scope === "one") return [todo];
+      return todos.filter((t) =>
+        t.seriesId === todo.seriesId &&
+        (scope === "all" || (t.seriesDate || "") >= (todo.seriesDate || "")));
+    }
+
+    function openDialog(todo, date) {
+      editing = todo;
+      const isSeries = !!(todo && todo.seriesId !== null);
+      dialogTitle.textContent = todo ? (isSeries ? "반복 일정 수정" : "할일 수정") : "할일 추가";
+      errorEl.hidden = true;
+
+      seriesInfo.hidden = !isSeries;
+      if (isSeries) {
+        seriesInfo.textContent = describeSeries(todo.seriesId) +
+          (todo.seriesDate && todo.date !== todo.seriesDate ? ` · 원래 날짜 ${todo.seriesDate}` : "");
+      }
+
+      const d = todo ? todo.date : date;
+      fText.value = todo ? todo.text : "";
+      fDate.value = d || toDateStr(new Date());
+      fDateTbd.checked = d === null;
+
+      // 반복 설정은 새 할일을 만들 때만 고를 수 있다
+      repeatToggleField.hidden = !!todo;
+      fRepeat.checked = false;
+      const base = d || toDateStr(new Date());
+      fRepeatStart.value = base;
+      fRepeatEnd.value = toDateStr(addDays(parseDate(base), 27));
+      fInterval.value = "1";
+      const baseDow = (parseDate(base).getDay() + 6) % 7;
+      fWeekdays.querySelectorAll("input").forEach((c) => { c.checked = Number(c.value) === baseDow; });
+
+      scopeField.hidden = !isSeries;
+      form.querySelector('input[name="scope"][value="one"]').checked = true;
+      deleteBtn.hidden = !todo;
+      cancelOnceBtn.hidden = !isSeries;
+      if (isSeries) cancelOnceBtn.textContent = todo.canceled ? "취소 되돌리기" : "이번만 취소";
+
+      const start = todo ? todo.startTime : null;
+      const end = todo ? todo.endTime : null;
+      fStart.value = start || "";
+      fStartTbd.checked = start === null;
+      fEnd.value = end || "";
+      fEndTbd.checked = end === null;
+
+      syncDate(); syncStart(); syncEnd(); syncRepeat();
+      dialog.showModal();
+      fText.focus();
+    }
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.hidden = false;
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const text = fText.value.trim();
+      if (!text) return showError("할일을 입력하세요.");
+
+      const makingSeries = !editing && fRepeat.checked;
+      const needDate = !makingSeries && !isManyScope();
+
+      const date = fDateTbd.checked ? null : fDate.value;
+      if (needDate && !fDateTbd.checked && !date) return showError("날짜를 고르거나 '일정 미정'을 체크하세요.");
+
+      const startTime = fStartTbd.checked ? null : fStart.value;
+      if (!fStartTbd.checked && !startTime) return showError("시작 시간을 입력하거나 '미정'을 체크하세요.");
+
+      const endTime = fEndTbd.checked ? null : fEnd.value;
+      if (!fEndTbd.checked && !endTime) return showError("끝나는 시간을 입력하거나 '미정'을 체크하세요.");
+
+      if (startTime && endTime && endTime < startTime) {
+        return showError("끝나는 시간이 시작 시간보다 빠릅니다.");
+      }
+
+      if (makingSeries) {
+        const weekdays = [...fWeekdays.querySelectorAll("input:checked")].map((c) => Number(c.value));
+        if (weekdays.length === 0) return showError("반복할 요일을 하나 이상 고르세요.");
+        const rs = fRepeatStart.value;
+        const re = fRepeatEnd.value;
+        if (!rs || !re) return showError("반복 기간의 시작일과 종료일을 고르세요.");
+        if (re < rs) return showError("반복 종료일이 시작일보다 빠릅니다.");
+        const interval = Number(fInterval.value) || 1;
+        const dates = repeatDates(rs, re, weekdays, interval);
+        if (dates === null) return showError("반복 기간은 3년 이내로 정해주세요.");
+        if (dates.length === 0) return showError("이 기간에는 고른 요일이 없습니다.");
+
+        // 날짜마다 따로 저장해서, 나중에 그 날짜만 수정하거나 취소할 수 있게 한다
+        const seriesId = newId();
+        series[seriesId] = { weekdays, interval, start: rs, end: re };
+        dates.forEach((d) => {
+          todos.push({
+            id: newId(), text, date: d, startTime, endTime, done: false,
+            seriesId, seriesDate: d, canceled: false,
+          });
+        });
+      } else if (editing && isManyScope()) {
+        scopeTargets(editing, getScope()).forEach((t) => Object.assign(t, { text, startTime, endTime }));
+      } else if (editing) {
+        Object.assign(editing, { text, date, startTime, endTime });
+      } else {
+        todos.push({
+          id: newId(), text, date, startTime, endTime, done: false,
+          seriesId: null, seriesDate: null, canceled: false,
+        });
+      }
+      save();
+      dialog.close();
+      render();
+    });
+
+    deleteBtn.addEventListener("click", () => {
+      if (!editing) return;
+      const targets = scopeTargets(editing, getScope());
+      const msg = targets.length > 1 ? `반복 일정 ${targets.length}개를 삭제할까요?` : "이 할일을 삭제할까요?";
+      if (!confirm(msg)) return;
+      const ids = new Set(targets.map((t) => t.id));
+      todos = todos.filter((t) => !ids.has(t.id));
+      cleanupSeries();
+      save();
+      dialog.close();
+      render();
+    });
+
+    // 반복 일정 중 이 날짜만 취소(또는 되돌리기). 다른 날짜는 그대로 둔다
+    cancelOnceBtn.addEventListener("click", () => {
+      if (!editing) return;
+      editing.canceled = !editing.canceled;
+      save();
+      dialog.close();
+      render();
+    });
+
+    $("cancel").addEventListener("click", () => dialog.close());
+
+    // ---------- 주간/월간 전환, 이동 ----------
+    const viewWeekBtn = document.getElementById("viewWeek");
+    const viewMonthBtn = document.getElementById("viewMonth");
+    const prevBtn = document.getElementById("prevWeek");
+    const todayBtn = document.getElementById("thisWeek");
+    const nextBtn = document.getElementById("nextWeek");
+    const jumpDateInput = document.getElementById("jumpDate");
+
+    function setView(v) {
+      view = v;
+      try { localStorage.setItem("calendarView", view); } catch (e) {}
+      render();
+    }
+    viewWeekBtn.addEventListener("click", () => setView("week"));
+    viewMonthBtn.addEventListener("click", () => setView("month"));
+
+    prevBtn.addEventListener("click", () => {
+      focusDate = view === "month"
+        ? new Date(focusDate.getFullYear(), focusDate.getMonth() - 1, 1)
+        : addDays(focusDate, -7);
+      render();
+    });
+    nextBtn.addEventListener("click", () => {
+      focusDate = view === "month"
+        ? new Date(focusDate.getFullYear(), focusDate.getMonth() + 1, 1)
+        : addDays(focusDate, 7);
+      render();
+    });
+    todayBtn.addEventListener("click", () => {
+      focusDate = new Date();
+      render();
+    });
+
+    // 열 방향 / 행 방향 전환
+    const toggleLayoutBtn = document.getElementById("toggleLayout");
+    let layout = "columns";
+    try { if (localStorage.getItem("calendarLayout") === "rows") layout = "rows"; } catch (e) {}
+
+    function applyLayout() {
+      weekEl.classList.toggle("rows", layout === "rows");
+      toggleLayoutBtn.textContent = layout === "rows" ? "▥ 열 방향으로 보기" : "☰ 행 방향으로 보기";
+    }
+    toggleLayoutBtn.addEventListener("click", () => {
+      layout = layout === "rows" ? "columns" : "rows";
+      try { localStorage.setItem("calendarLayout", layout); } catch (e) {}
+      applyLayout();
+    });
+    applyLayout();
+
+    // 날짜를 고르면 그 날짜가 속한 주(주간) 또는 달(월간)로 이동
+    jumpDateInput.addEventListener("change", (e) => {
+      const value = e.target.value; // YYYY-MM-DD
+      if (!value) return;
+      const [y, m, d] = value.split("-").map(Number);
+      focusDate = new Date(y, m - 1, d);
+      render();
+    });
+
+    document.getElementById("clear").addEventListener("click", () => {
+      const doneCount = todos.filter((t) => t.done).length;
+      if (doneCount === 0) return;
+      if (!confirm(`완료한 할일 ${doneCount}개를 모두 삭제할까요?`)) return;
+      todos = todos.filter((t) => !t.done);
+      cleanupSeries();
+      save();
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
