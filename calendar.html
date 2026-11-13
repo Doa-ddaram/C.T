@@ -281,11 +281,18 @@
     }
     .month-more:hover, .month-count:hover { background: #f3f4f6; color: #1f2937; }
     .month-count { display: none; }
+    /* 좁은 화면에서 고른 날짜의 할일을 달력 아래에 보여주는 칸 */
+    .month-day { display: none; }
+    .month-day-actions { display: flex; gap: 6px; }
+    .month-day-actions button { padding: 4px 10px; font-size: 0.85rem; }
     @media (max-width: 640px) {
-      .month-cell { min-height: 64px; padding: 4px 2px; }
+      .month-cell { min-height: 64px; padding: 4px 2px; cursor: pointer; }
       .month-add, .month-item, .month-more { display: none; }
       .month-count { display: block; color: #2563eb; font-weight: 600; }
       .month-date { padding: 2px 5px; font-size: 0.8rem; }
+      .month-cell.selected { background: #eff6ff; box-shadow: inset 0 0 0 2px #2563eb; }
+      .month-day { display: flex; margin-top: 12px; min-height: 0; }
+      .month-day .column-head { align-items: center; }
     }
 
     /* 반복 일정 / 취소 표시 */
@@ -825,6 +832,9 @@
       return weekDates;
     }
 
+    // 휴대폰처럼 좁은 화면인지 (CSS의 max-width: 640px와 맞춘다)
+    const isNarrow = () => window.matchMedia("(max-width: 640px)").matches;
+
     const MONTH_MAX_ITEMS = 3; // 월간 칸 하나에 보여줄 할일 수
 
     function renderMonthItem(todo) {
@@ -845,6 +855,7 @@
       const today = toDateStr(new Date());
       const year = focusDate.getFullYear();
       const month = focusDate.getMonth();
+      const selectedStr = toDateStr(focusDate); // 좁은 화면에서 아래에 할일을 보여줄 날짜
       weekLabel.textContent = `${year}년 ${month + 1}월`;
 
       monthEl.innerHTML = "";
@@ -880,10 +891,19 @@
         if (day.getDay() === 6) cell.classList.add("sat");
         if (day.getDay() === 0) cell.classList.add("sun");
 
+        // 넓은 화면: 그 주의 주간 보기로 간다.
+        // 좁은 화면: 이동하지 않고, 칸 전체를 누르면 그 날짜를 골라 아래 칸에 할일을 보여준다.
         const goWeek = () => {
+          if (isNarrow()) return;
           focusDate = day;
           setView("week");
         };
+        if (dateStr === selectedStr) cell.classList.add("selected");
+        cell.addEventListener("click", () => {
+          if (!isNarrow()) return;
+          focusDate = day;
+          render();
+        });
 
         const top = document.createElement("div");
         top.className = "month-cell-top";
@@ -927,6 +947,29 @@
       }
 
       monthEl.appendChild(grid);
+
+      // 고른 날짜의 할일 칸 (좁은 화면에서만 보인다)
+      const sel = parseDate(selectedStr);
+      const dayH2 = document.createElement("h2");
+      dayH2.textContent = `${sel.getMonth() + 1}월 ${sel.getDate()}일 (${MONTH_DAY_NAMES[sel.getDay()]})`;
+      if (selectedStr === today) {
+        const badge = document.createElement("span");
+        badge.className = "today-badge";
+        badge.textContent = "오늘";
+        dayH2.append(badge);
+      }
+      const actions = document.createElement("div");
+      actions.className = "month-day-actions";
+      const toWeek = document.createElement("button");
+      toWeek.className = "secondary";
+      toWeek.textContent = "주간 보기";
+      toWeek.addEventListener("click", () => setView("week"));
+      actions.append(toWeek);
+      const dayPanel = document.createElement("section");
+      dayPanel.className = "column month-day";
+      fillColumn(dayPanel, selectedStr, [dayH2, actions]);
+      monthEl.appendChild(dayPanel);
+
       return monthDates;
     }
 
