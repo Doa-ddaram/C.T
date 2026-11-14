@@ -144,6 +144,24 @@
     .ref-title { margin: 0 0 4px; color: #1d4ed8; font-weight: 600; font-size: 0.85rem; }
     .ref p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
     .ref a { color: #1d4ed8; font-size: 0.85rem; }
+
+    /* 오늘의 질문 */
+    p.field { margin: 0; font-weight: 600; }
+    .prompts-hint { margin: 2px 0 10px; }
+    .prompt + .prompt { margin-top: 8px; }
+    .prompt-q {
+      display: block;
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      color: #1f2937;
+      text-align: left;
+      line-height: 1.4;
+    }
+    .prompt-q:hover { background: #f3f4f6; }
+    .prompt.open .prompt-q { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; font-weight: 600; }
+    .prompt textarea.prompt-a { margin-top: 6px; min-height: 72px; }
   </style>
 </head>
 <body>
@@ -175,6 +193,11 @@
       <div class="field-wrap">
         <label class="field" for="title">제목 (선택)</label>
         <input type="text" id="title" maxlength="200" placeholder="오늘의 제목">
+      </div>
+      <div class="field-wrap">
+        <p class="field" id="promptsLabel">오늘의 질문</p>
+        <p class="hint prompts-hint">답하고 싶은 질문만 골라 보세요. 답한 내용은 일기와 함께 저장됩니다.</p>
+        <div id="prompts"></div>
       </div>
       <div class="field-wrap">
         <label class="field" for="body">일기</label>
@@ -250,6 +273,136 @@
       }
     }
 
+    // ---------- 오늘의 질문 ----------
+    // 성격이 다른 묶음 3개에서 하루에 하나씩 뽑는다.
+    // id는 한 번 정하면 바꾸지 않는다. 문구를 고치거나 새 id로 추가하는 것은 괜찮다.
+    // 묶음마다 문항 수를 다르게(31·30·29) 두어서, 같은 세 질문이 함께 나오는 날이 거의 생기지 않게 한다.
+    const PROMPT_GROUPS = [
+      // ① 오늘 하루 (장면·사실)
+      [
+        { id: "a01", q: "오늘 가장 기억에 남는 장면은 무엇인가요?" },
+        { id: "a02", q: "오늘 가장 오래 시간을 쓴 일은 무엇인가요?" },
+        { id: "a03", q: "오늘 먹은 것 중 가장 맛있었던 것은 무엇인가요?" },
+        { id: "a04", q: "오늘 처음 해 본 일이 있나요?" },
+        { id: "a05", q: "오늘 어디를 다녀왔나요?" },
+        { id: "a06", q: "오늘 본 것 중 눈길이 갔던 것은 무엇인가요?" },
+        { id: "a07", q: "오늘 들은 말 중 기억에 남는 한마디는 무엇인가요?" },
+        { id: "a08", q: "오늘 가장 바빴던 때는 언제였나요?" },
+        { id: "a09", q: "오늘 계획과 다르게 흘러간 일이 있나요?" },
+        { id: "a10", q: "오늘 끝낸 일 중 가장 뿌듯한 것은 무엇인가요?" },
+        { id: "a11", q: "오늘 아침은 어떻게 시작했나요?" },
+        { id: "a12", q: "오늘 날씨는 어땠고, 하루에 어떤 영향을 줬나요?" },
+        { id: "a13", q: "오늘 돈을 쓴 것 중 가장 잘 썼다고 생각하는 것은 무엇인가요?" },
+        { id: "a14", q: "오늘 듣거나 본 노래·영상·글 중 기억나는 것은 무엇인가요?" },
+        { id: "a15", q: "오늘 가장 편안했던 순간은 언제였나요?" },
+        { id: "a16", q: "오늘 예상하지 못한 일이 있었나요?" },
+        { id: "a17", q: "오늘 몸을 움직인 일은 무엇이 있었나요?" },
+        { id: "a18", q: "오늘 미뤄 둔 일은 무엇인가요?" },
+        { id: "a19", q: "오늘 사진으로 한 장만 남긴다면 어떤 장면인가요?" },
+        { id: "a20", q: "오늘 누구와 가장 많이 이야기했나요?" },
+        { id: "a21", q: "오늘 가장 집중했던 순간은 언제였나요?" },
+        { id: "a22", q: "오늘 쉬는 시간에는 무엇을 했나요?" },
+        { id: "a23", q: "오늘 하루를 세 단어로 줄이면 무엇인가요?" },
+        { id: "a24", q: "오늘 가장 잘한 선택은 무엇인가요?" },
+        { id: "a25", q: "오늘 새로 만나거나 오랜만에 연락한 사람이 있나요?" },
+        { id: "a26", q: "오늘 저녁 시간은 어떻게 보냈나요?" },
+        { id: "a27", q: "오늘 작지만 기분 좋았던 일은 무엇인가요?" },
+        { id: "a28", q: "오늘 가장 힘들었던 일은 무엇인가요?" },
+        { id: "a29", q: "오늘 하루에 제목을 붙인다면 무엇인가요?" },
+        { id: "a30", q: "오늘 평소와 달랐던 점은 무엇인가요?" },
+        { id: "a31", q: "오늘 가장 많이 한 생각은 무엇인가요?" },
+      ],
+      // ② 마음 (감정·사람)
+      [
+        { id: "b01", q: "오늘 기분을 날씨로 표현하면 어떤가요?" },
+        { id: "b02", q: "오늘 고마웠던 사람은 누구인가요?" },
+        { id: "b03", q: "오늘 나를 웃게 한 것은 무엇인가요?" },
+        { id: "b04", q: "오늘 마음이 불편했던 순간이 있었나요?" },
+        { id: "b05", q: "오늘 누군가에게 해 주고 싶었지만 못 한 말이 있나요?" },
+        { id: "b06", q: "오늘 나에게 힘이 된 것은 무엇인가요?" },
+        { id: "b07", q: "오늘 걱정했던 일은 무엇이고, 지금은 어떤가요?" },
+        { id: "b08", q: "오늘 기분에 점수를 준다면 10점 중 몇 점인가요? 이유는요?" },
+        { id: "b09", q: "오늘 누군가에게 도움을 주거나 받은 일이 있나요?" },
+        { id: "b10", q: "오늘 가장 마음이 놓였던 순간은 언제였나요?" },
+        { id: "b11", q: "오늘 짜증이 났던 일이 있다면, 무엇 때문이었나요?" },
+        { id: "b12", q: "오늘 감사한 일 한 가지는 무엇인가요?" },
+        { id: "b13", q: "오늘 보고 싶었던 사람이 있나요?" },
+        { id: "b14", q: "오늘 나 자신을 칭찬한다면 무엇을 칭찬하고 싶나요?" },
+        { id: "b15", q: "오늘 가장 설렜던 순간은 언제였나요?" },
+        { id: "b16", q: "오늘 지친 순간에 나는 어떻게 했나요?" },
+        { id: "b17", q: "오늘 누군가의 말이나 행동 중 마음에 남은 것이 있나요?" },
+        { id: "b18", q: "오늘 기분이 바뀐 순간이 있었다면, 무엇이 계기였나요?" },
+        { id: "b19", q: "오늘 스스로에게 너그러웠나요, 엄격했나요?" },
+        { id: "b20", q: "오늘 아쉬웠던 일은 무엇인가요?" },
+        { id: "b21", q: "오늘 함께 있어서 좋았던 사람은 누구인가요?" },
+        { id: "b22", q: "오늘 혼자 있는 시간은 어땠나요?" },
+        { id: "b23", q: "오늘 마음속으로만 한 생각 중 적어 두고 싶은 것이 있나요?" },
+        { id: "b24", q: "오늘 나를 가장 편하게 해 준 것은 무엇인가요?" },
+        { id: "b25", q: "오늘 부러웠던 것이 있었나요?" },
+        { id: "b26", q: "오늘 누군가에게 미안했던 일이 있나요?" },
+        { id: "b27", q: "지금 이 순간의 기분을 한 단어로 말하면 무엇인가요?" },
+        { id: "b28", q: "오늘 참았던 것이 있나요?" },
+        { id: "b29", q: "오늘 뿌듯했던 순간은 언제였나요?" },
+        { id: "b30", q: "오늘 가장 크게 느낀 감정은 무엇인가요?" },
+      ],
+      // ③ 생각·내일 (배움·계획)
+      [
+        { id: "c01", q: "오늘 새로 알게 된 것은 무엇인가요?" },
+        { id: "c02", q: "오늘을 다시 산다면 바꾸고 싶은 한 가지는 무엇인가요?" },
+        { id: "c03", q: "내일의 나에게 한마디 한다면 무엇인가요?" },
+        { id: "c04", q: "내일 가장 먼저 하고 싶은 일은 무엇인가요?" },
+        { id: "c05", q: "오늘 한 일 중 내일도 이어 가고 싶은 것은 무엇인가요?" },
+        { id: "c06", q: "요즘 가장 자주 떠오르는 고민은 무엇인가요?" },
+        { id: "c07", q: "오늘 깨달은 나의 습관이 있나요?" },
+        { id: "c08", q: "이번 주가 끝나기 전에 꼭 하고 싶은 일은 무엇인가요?" },
+        { id: "c09", q: "오늘 시간을 더 쓰고 싶었던 일은 무엇인가요?" },
+        { id: "c10", q: "오늘 덜 해도 됐을 일은 무엇인가요?" },
+        { id: "c11", q: "요즘 기다리고 있는 일은 무엇인가요?" },
+        { id: "c12", q: "오늘 배운 것을 한 문장으로 적는다면 무엇인가요?" },
+        { id: "c13", q: "내일 하루가 어떤 날이 되면 좋겠나요?" },
+        { id: "c14", q: "요즘 더 잘하고 싶은 것은 무엇인가요?" },
+        { id: "c15", q: "오늘의 나는 일주일 전의 나와 무엇이 달라졌나요?" },
+        { id: "c16", q: "요즘 나에게 가장 중요한 것은 무엇인가요?" },
+        { id: "c17", q: "오늘 내린 결정 중 다시 생각해 보고 싶은 것이 있나요?" },
+        { id: "c18", q: "내일 꼭 피하고 싶은 일은 무엇인가요?" },
+        { id: "c19", q: "요즘 새로 시작해 보고 싶은 것은 무엇인가요?" },
+        { id: "c20", q: "오늘 궁금해진 것이 있나요?" },
+        { id: "c21", q: "한 달 뒤의 내가 오늘을 본다면 뭐라고 할까요?" },
+        { id: "c22", q: "오늘 나에게 필요했던 것은 무엇인가요?" },
+        { id: "c23", q: "내일의 나를 위해 오늘 밤 해 둘 수 있는 일은 무엇인가요?" },
+        { id: "c24", q: "요즘 그만두고 싶은 습관이 있나요?" },
+        { id: "c25", q: "오늘 하루에서 한 가지만 기억한다면 무엇을 기억하고 싶나요?" },
+        { id: "c26", q: "요즘 나를 가장 기대하게 하는 것은 무엇인가요?" },
+        { id: "c27", q: "오늘 잘 풀리지 않은 일은, 다음에 어떻게 해 보고 싶나요?" },
+        { id: "c28", q: "이번 달 안에 이루고 싶은 작은 목표는 무엇인가요?" },
+        { id: "c29", q: "오늘 하루에게 고맙다고 말한다면 무엇이 고마운가요?" },
+      ],
+    ];
+
+    // 날짜의 일련번호. 날짜 문자열에서 바로 계산해서 시간대·서머타임의 영향을 받지 않는다
+    function dayNo(dateStr) {
+      const [y, m, d] = dateStr.split("-").map(Number);
+      return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+    }
+
+    // 그 날짜의 질문 3개. 저장하지 않고 날짜만으로 정한다 (같은 날짜는 언제 열어도 같은 질문).
+    // 묶음마다 하루에 한 칸씩 차례로 넘어가므로, 같은 질문은 한 바퀴(약 한 달)가 지나야 다시 나온다.
+    function pickPrompts(dateStr) {
+      const n = dayNo(dateStr);
+      return PROMPT_GROUPS.map((g) => g[((n % g.length) + g.length) % g.length]);
+    }
+
+    // 저장된 답변 중 형식이 맞는 것만 고른다
+    function savedPrompts(entry) {
+      const list = entry && Array.isArray(entry.prompts) ? entry.prompts : [];
+      return list.filter((p) => p && typeof p.q === "string" && typeof p.a === "string" && p.a.trim()
+        && Number.isInteger(p.slot) && p.slot >= 0 && p.slot < PROMPT_GROUPS.length);
+    }
+
+    function hasContent(entry) {
+      return !!entry && !!(entry.title || entry.body || savedPrompts(entry).length);
+    }
+
     // ---------- 화면 ----------
     const $ = (id) => document.getElementById(id);
     const titleEl = $("title");
@@ -274,7 +427,9 @@
       const title = titleEl.value.trim();
       // 본문은 줄바꿈·들여쓰기를 살리고 끝의 빈 줄만 정리한다
       const body = bodyEl.value.replace(/\s+$/, "");
-      const entry = title || body.trim() ? { title, body, updatedAt: Date.now() } : null;
+      const prompts = collectPrompts();
+      const entry = title || body.trim() || prompts.length ? { title, body, updatedAt: Date.now() } : null;
+      if (entry && prompts.length) entry.prompts = prompts;
       if (writeEntry(cur, entry)) {
         dirty = false;
         $("deleteBtn").hidden = !entry;
@@ -305,6 +460,61 @@
       return (text || "").split("\n").map((l) => l.trim()).find((l) => l) || "";
     }
 
+    // 지금 화면에 있는 질문 3개 ({ slot, id, q, input })
+    let promptItems = [];
+
+    // 칸마다: 저장된 답이 있으면 그때의 질문을, 없으면 그 날짜의 질문을 보여준다
+    function renderPrompts(entry) {
+      const saved = savedPrompts(entry);
+      const picks = pickPrompts(cur);
+      const box = $("prompts");
+      box.replaceChildren();
+      promptItems = picks.map((pick, slot) => {
+        const s = saved.find((p) => p.slot === slot);
+        const item = { slot, id: s ? s.id : pick.id, q: s ? s.q : pick.q };
+
+        const wrap = document.createElement("div");
+        wrap.className = "prompt";
+        const q = document.createElement("button");
+        q.type = "button";
+        q.className = "prompt-q";
+        q.textContent = item.q;
+        const input = document.createElement("textarea");
+        input.className = "prompt-a";
+        input.id = `promptAnswer${slot}`;
+        input.placeholder = "짧게 적어도 좋아요.";
+        input.setAttribute("aria-label", item.q);
+        input.value = s ? s.a : "";
+        q.setAttribute("aria-controls", input.id);
+
+        const setOpen = (open) => {
+          wrap.classList.toggle("open", open);
+          input.hidden = !open;
+          q.setAttribute("aria-expanded", String(open));
+        };
+        setOpen(!!s);
+        // 질문을 누르면 답변 칸을 펼친다. 쓴 답이 있으면 접지 않는다
+        q.addEventListener("click", () => {
+          if (input.hidden) { setOpen(true); input.focus(); }
+          else if (!input.value.trim()) setOpen(false);
+          else input.focus();
+        });
+        input.addEventListener("input", onInput);
+
+        wrap.append(q, input);
+        box.appendChild(wrap);
+        item.input = input;
+        return item;
+      });
+    }
+
+    // 답을 쓴 질문만 모은다. 질문 문구도 함께 저장해서, 나중에 질문지를 바꿔도 지난 답이 그대로 남는다
+    function collectPrompts() {
+      return promptItems
+        .map((p) => ({ slot: p.slot, id: p.id, q: p.q, a: p.input.value.replace(/\s+$/, "") }))
+        .filter((p) => p.a.trim());
+    }
+
     function renderRef() {
       const r = loadReviews()[cur];
       const has = r && (r.highlight || r.comment);
@@ -333,7 +543,9 @@
         dateEl.textContent = longLabel(d);
         const main = document.createElement("div");
         main.className = "h-main";
-        main.textContent = e.title || firstLine(e.body) || "(내용 없음)";
+        // 제목도 본문도 없으면 첫 답변을 보여준다
+        const answers = savedPrompts(e);
+        main.textContent = e.title || firstLine(e.body) || (answers[0] && firstLine(answers[0].a)) || "(내용 없음)";
         b.append(dateEl, main);
         // 제목이 있으면 본문 첫 줄을 아래에 보여준다
         if (e.title && firstLine(e.body)) {
@@ -360,8 +572,10 @@
       bodyEl.value = e.body || "";
       dirty = false;
       setStatus(e.updatedAt ? "저장된 내용" : "");
-      $("deleteBtn").hidden = !e.title && !e.body;
+      $("deleteBtn").hidden = !hasContent(e);
+      $("promptsLabel").textContent = isToday ? "오늘의 질문" : "이 날의 질문";
 
+      renderPrompts(e);
       renderRef();
       renderHistory();
     }

@@ -185,10 +185,13 @@
       // 일기
       const diary = loadJSON("diaryEntries") || {};
       const d = diary[today];
-      if (d && (d.title || d.body)) {
+      // 오늘의 질문에 답한 것만 있어도 쓴 것으로 본다
+      const firstLine = (text) => (text || "").split("\n").map((l) => l.trim()).find((l) => l) || "";
+      const answers = (d && Array.isArray(d.prompts) ? d.prompts : [])
+        .filter((p) => p && typeof p.a === "string" && p.a.trim());
+      if (d && (d.title || d.body || answers.length)) {
         setStatus("diaryStatus", "오늘 작성함", "ok");
-        const first = (d.body || "").split("\n").map((l) => l.trim()).find((l) => l) || "";
-        setPreview("diaryPreview", d.title || first);
+        setPreview("diaryPreview", d.title || firstLine(d.body) || firstLine(answers[0] && answers[0].a));
       } else {
         setStatus("diaryStatus", "아직 안 썼어요");
         setPreview("diaryPreview", "");
